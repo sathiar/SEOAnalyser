@@ -10,7 +10,7 @@
     <form id="form1" runat="server">
         <asp:Table runat="server" style="width: 100%;">
             <asp:TableHeaderRow Width="100%">
-                <asp:TableCell Font-Size="XX-Large" Width="100%" BackColor="LightBlue">Welcome to SEO analyser</asp:TableCell>
+                <asp:TableCell Font-Size="XX-Large" Width="100%" BackColor="LightBlue">Welcome to SEO Analyser</asp:TableCell>
             </asp:TableHeaderRow>
         </asp:Table><br /><br />
 
