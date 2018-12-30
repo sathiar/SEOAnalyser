@@ -86,10 +86,10 @@ namespace WebClient
             {
                 isUrlPassed = (txtWords.Rows == 1) ? true : false;
                 var counter = new util.Analyser(txtWords.Text, isUrlPassed, textStopWords.Text);
-                analyseWords(gridViewWords, counter.GetWordsDictionary, "wordsTable");
-                analyseWords(gridViewKeywords, counter.GetKeywordsDictionary, "keywordsTable");
+                analyseWords(gridViewWords, counter.AddWordsCountToDictionary, "wordsTable");
+                analyseWords(gridViewKeywords, counter.GetKeywordsCount, "keywordsTable");
 
-                labelExternalLinkNumber.Text = String.Format("Number of external links: {0}", counter.GetExternalLinksNumber());
+                labelExternalLinkNumber.Text = String.Format("Number of external links: {0}", counter.GetExternalLinksCount());
             }
             catch (UriFormatException)
             {
