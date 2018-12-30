@@ -12,24 +12,14 @@ namespace WebClient.util
 {
     public class Analyser
     {
-
-        //private readonly char[] _wordsSeparator;
         private readonly HtmlNode _rootNode;
         private readonly char[] _delimiterList = { ' ', ',', '.', '\r', '\n', '\t', '/' };
 
-        private Dictionary<string, int> _wordsDictionary;
-        private Dictionary<string, int> _keywordsDictionary;
-        //Dictionary due framework 2.0 requirement, Hashset<string> will be better )
-        private readonly Dictionary<string, int> _stopWordsDictionary;
+        private Dictionary<string, int> _words;
+        private Dictionary<string, int> _keywords;
+        private readonly Dictionary<string, int> _wordToIgnore;
         private int _extLinksNumber = -1;
 
-        /// <summary>
-        /// Create words counter 
-        /// </summary>
-        /// <param name="pageUrlOrText"></param>
-        /// <param name="isUrl">Is in pageUrlOrText set url or some text</param>
-        /// <param name="wordsToIgnore">User's stop words</param>
-        /// <param name="wordsSeparator">User's word separators</param>
         public Analyser(string pageUrlOrText, bool isUrl, string wordsToIgnore = null, char[] _delimiters = null)
         {
             if (_delimiters != null)
@@ -37,11 +27,10 @@ namespace WebClient.util
 
             if (!String.IsNullOrEmpty(wordsToIgnore))
             {
-                //insert stopWords in dictionary
-                _stopWordsDictionary = new Dictionary<string, int>();
-                SplitTextAndCount(wordsToIgnore, _stopWordsDictionary, null, _delimiterList, true);
-                if (_stopWordsDictionary.Count == 0)
-                    _stopWordsDictionary = null;
+                _wordToIgnore = new Dictionary<string, int>();
+                SplitTextAndCount(wordsToIgnore, _wordToIgnore, null, _delimiterList, true);
+                if (_wordToIgnore.Count == 0)
+                    _wordToIgnore = null;
             }
 
             HtmlDocument htmlDocument;
@@ -49,14 +38,14 @@ namespace WebClient.util
             try
             {
                 if (isUrl)
-                    htmlDocument = new HtmlWeb().Load(pageUrlOrText); //load web page by url
+                    htmlDocument = new HtmlWeb().Load(pageUrlOrText); //load from url
                 else
                 {
                     htmlDocument = new HtmlDocument();
-                    htmlDocument.LoadHtml(pageUrlOrText); // load web page/text from string
+                    htmlDocument.LoadHtml(pageUrlOrText); // load from string
                 }
             }
-            catch (HtmlWebException ex) //HAP exception
+            catch (HtmlWebException ex) 
             {
                 throw new WebException("HtmlAgilityPack: " + ex.Message);
             }
@@ -68,59 +57,55 @@ namespace WebClient.util
         /// Count word occurencies in document and insert word/occurencies in dictionary
         /// </summary>
         /// <returns>Dictionary of words</returns>
-        public Dictionary<string, int> GetWordsDictionary()
+        public Dictionary<string, int> AddWordsCountToDictionary()
         {
-            if (_wordsDictionary != null)
-                return _wordsDictionary; //return already counted dic
+            if (_words != null)
+                return _words; 
 
-            _wordsDictionary = new Dictionary<string, int>();
-            ProcessAllTextNodes(_rootNode, _wordsDictionary, _stopWordsDictionary, _delimiterList, true);
+            _words = new Dictionary<string, int>();
+            CompleteTextNodesSearch(_rootNode, _words, _wordToIgnore, _delimiterList, true);
 
-            if (_wordsDictionary.Count == 0)
-                _wordsDictionary = null;
+            if (_words.Count == 0)
+                _words = null;
 
-            return _wordsDictionary;
+            return _words;
         }
 
         /// <summary>
-        /// Try to get keywords from "meta keywords" and count this keywords in text
+        /// Get keywords from "meta keywords" and count this keywords in text
         /// If words are already counted (GetWordsDictionary() have been invoked), word occurences will get from dictionary of words
         /// Otherwise will be count by searching in text
         /// </summary>
         /// <returns>Keywords dictionary</returns>
-        public Dictionary<string, int> GetKeywordsDictionary()
+        public Dictionary<string, int> GetKeywordsCount()
         {
-            if (_keywordsDictionary != null)
-                return _keywordsDictionary; //return already counted dic
+            if (_keywords != null)
+                return _keywords; //return already counted dic
 
-            _keywordsDictionary = GetKeywordsDictionaryFromMetaTags(_rootNode, _delimiterList);
-            if (_keywordsDictionary != null) //are keywords exists in meta
-                if (_wordsDictionary != null)
+            _keywords = GetMetaTagsKeywordsCount(_rootNode, _delimiterList);
+            if (_keywords != null) 
+                if (_words != null)
                 {
                     //get word occurencies from dicionary of words
-                    var keywordsDictionaryTemp = new Dictionary<string, int>();
-                    foreach (var keyword in _keywordsDictionary.Keys)
+                    var tempKeywords = new Dictionary<string, int>();
+                    foreach (var keyword in _keywords.Keys)
                     {
-                        keywordsDictionaryTemp[keyword] = _wordsDictionary.ContainsKey(keyword) ? _wordsDictionary[keyword] : 0;
+                        tempKeywords[keyword] = _words.ContainsKey(keyword) ? _words[keyword] : 0;
                     }
-                    _keywordsDictionary = keywordsDictionaryTemp;
+                    _keywords = tempKeywords;
                 }
                 else
                 {
-                    //Full search in text, adding new words not allowed by last param
-                    ProcessAllTextNodes(_rootNode, _keywordsDictionary, _stopWordsDictionary, _delimiterList, false);
+                    //Full search in text
+                    CompleteTextNodesSearch(_rootNode, _keywords, _wordToIgnore, _delimiterList, false);
                 }
-            return _keywordsDictionary;
+            return _keywords;
         }
 
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <returns>External links number in text</returns>
-        public int GetExternalLinksNumber()
+        public int GetExternalLinksCount()
         {
             if (_extLinksNumber >= 0)
-                return _extLinksNumber; //return already counted val
+                return _extLinksNumber; 
 
             _extLinksNumber = 0;
             var nodes = _rootNode.SelectNodes(@"//a[@href]");
@@ -143,16 +128,15 @@ namespace WebClient.util
             return _extLinksNumber;
         }
 
-
-        internal static void ProcessAllTextNodes(HtmlNode rootNode, Dictionary<string, int> dic, Dictionary<string, int> stopWordsDictionary,
+        internal static void CompleteTextNodesSearch(HtmlNode rootNode, Dictionary<string, int> dic, Dictionary<string, int> stopWordsDictionary,
             char[] wordsSeparator, bool isCanAddNewKeys)
         {
             foreach (var node in rootNode.Descendants("#text"))
             {
-                if (String.Compare(node.ParentNode.Name, "script", true, CultureInfo.InvariantCulture) != 0) //ignore inner text in <script>abcabc</script>
+                if (String.Compare(node.ParentNode.Name, "script", true, CultureInfo.InvariantCulture) != 0)
                 {
                     string s = node.InnerText;
-                    s = ReplaceNotLetters(ReplaceSpecialCharacters(s)).Trim(); //clean text
+                    s = ReplaceNotLetters(ReplaceSpecialCharacters(s)).Trim();
                     if (!String.IsNullOrEmpty(s))
                     {
                         SplitTextAndCount(s, dic, stopWordsDictionary, wordsSeparator, isCanAddNewKeys);
@@ -161,7 +145,7 @@ namespace WebClient.util
             }
         }
 
-        internal static Dictionary<string, int> GetKeywordsDictionaryFromMetaTags(HtmlNode rootNode, char[] wordsSeparator)
+        internal static Dictionary<string, int> GetMetaTagsKeywordsCount(HtmlNode rootNode, char[] wordsSeparator)
         {
             HtmlNode keywordsNode = rootNode.SelectSingleNode("//meta[@name='Keywords']");
             if (keywordsNode != null)
@@ -169,11 +153,11 @@ namespace WebClient.util
                 string keyWords = keywordsNode.GetAttributeValue("content", "");
                 if (!String.IsNullOrEmpty(keyWords))
                 {
-                    string[] keyWordsSplitted = keyWords.Split(wordsSeparator, StringSplitOptions.RemoveEmptyEntries);
-                    if (keyWordsSplitted.Length > 0)
+                    string[] splittedKeywords = keyWords.Split(wordsSeparator, StringSplitOptions.RemoveEmptyEntries);
+                    if (splittedKeywords.Length > 0)
                     {
                         var keywordDictionary = new Dictionary<string, int>();
-                        foreach (var keyWord in keyWordsSplitted)
+                        foreach (var keyWord in splittedKeywords)
                         {
                             keywordDictionary[keyWord.ToLower()] = 0;
                         }
@@ -215,5 +199,4 @@ namespace WebClient.util
             return Regex.Replace(s, @"[^a-zA-Z]+", " ");
         }
     }
-
 }
