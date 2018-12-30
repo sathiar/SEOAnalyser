@@ -10,13 +10,14 @@ number of external links in the text.
 ASP.NET applications, .NET Framework 2.0 or higher
 
 # Implementation requirements
-• Analysis options listed in the task description can be turn on or off with checkboxes
-• Output results must be in a table with ability to sort
+• Analysis options listed in the task description can be turn on or off with checkboxes<br/>
+• Output results must be in a table with ability to sort<br/>
 • Application should handle properly unexpected behaviours (wrong URL, not responding site, etc)
 
 # How to setup and run locally
-Clone or download this repo
-Open and build solution : SEOAnalyser/SEOAnalyser_SathiaR.sln
+Clone or download this repo<br/>
+Open and build solution : SEOAnalyser/SEOAnalyser_SathiaR.sln<br/>
+Run the solution by clicking Crtl + F5 or F5<br/>
 Navigate to : http://localhost:60396/ (port is configurable)
 
 
